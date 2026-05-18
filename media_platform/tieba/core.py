@@ -59,6 +59,30 @@ class TieBaCrawler(AbstractCrawler):
         self._page_extractor = TieBaExtractor()
         self.cdp_manager = None
 
+    @staticmethod
+    def _needs_manual_verification(page_title: str) -> bool:
+        return "百度安全验证" in page_title
+
+    async def _wait_for_manual_verification_if_needed(self, timeout_seconds: int = 180) -> None:
+        page_title = await self.context_page.title()
+        if not self._needs_manual_verification(page_title):
+            return
+
+        utils.logger.warning(
+            "[TieBaCrawler] Tieba opened Baidu security verification. "
+            f"Please complete verification in the visible browser within {timeout_seconds}s."
+        )
+
+        for _ in range(timeout_seconds):
+            await asyncio.sleep(1)
+            page_title = await self.context_page.title()
+            if not self._needs_manual_verification(page_title):
+                utils.logger.info("[TieBaCrawler] Manual verification completed.")
+                await asyncio.sleep(2)
+                return
+
+        raise RuntimeError("Tieba manual verification was not completed in time.")
+
     async def start(self) -> None:
         """
         Start the crawler
@@ -107,6 +131,7 @@ class TieBaCrawler(AbstractCrawler):
 
             # First visit Baidu homepage, then click Tieba link to avoid triggering security verification
             await self._navigate_to_tieba_via_baidu()
+            await self._wait_for_manual_verification_if_needed()
 
             # Create a client to interact with the baidutieba website.
             self.tieba_client = await self.create_tieba_client(
