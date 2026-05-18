@@ -472,8 +472,11 @@ class BaiduTieBaClient(AbstractApiClient):
 
         result: List[TiebaComment] = []
         current_page = 1
+        limit_comments = max_count > 0
 
-        while note_detail.total_replay_page >= current_page and len(result) < max_count:
+        while note_detail.total_replay_page >= current_page and (
+            not limit_comments or len(result) < max_count
+        ):
             utils.logger.info(
                 f"[BaiduTieBaClient.get_note_all_comments] Accessing comment API, "
                 f"note_id: {note_detail.note_id}, page: {current_page}"
@@ -490,7 +493,7 @@ class BaiduTieBaClient(AbstractApiClient):
                     break
 
                 # Limit comment count
-                if len(result) + len(comments) > max_count:
+                if limit_comments and len(result) + len(comments) > max_count:
                     comments = comments[:max_count - len(result)]
 
                 if callback:
