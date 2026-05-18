@@ -24,6 +24,7 @@ import socket
 import httpx
 import signal
 import atexit
+from collections.abc import Awaitable, Callable
 from typing import Optional, Dict, Any
 from playwright.async_api import Browser, BrowserContext, Playwright
 
@@ -324,14 +325,20 @@ class CDPBrowserManager:
                 utils.logger.info(
                     "[CDPBrowserManager] Please check your browser for a confirmation dialog and accept it"
                 )
-                self.browser = await playwright.chromium.connect_over_cdp(
-                    ws_url, timeout=config.BROWSER_LAUNCH_TIMEOUT * 1000
+                self.browser = await self._connect_with_retry(
+                    connect_action=lambda: playwright.chromium.connect_over_cdp(
+                        ws_url, timeout=config.BROWSER_LAUNCH_TIMEOUT * 1000
+                    ),
+                    ws_url=ws_url,
                 )
             else:
                 # For launched browser, get WebSocket URL first
                 ws_url = await self._get_browser_websocket_url(self.debug_port)
                 utils.logger.info(f"[CDPBrowserManager] Connecting to browser via CDP: {ws_url}")
-                self.browser = await playwright.chromium.connect_over_cdp(ws_url)
+                self.browser = await self._connect_with_retry(
+                    connect_action=lambda: playwright.chromium.connect_over_cdp(ws_url),
+                    ws_url=ws_url,
+                )
 
             if self.browser.is_connected():
                 utils.logger.info("[CDPBrowserManager] Successfully connected to browser")
@@ -344,6 +351,39 @@ class CDPBrowserManager:
         except Exception as e:
             utils.logger.error(f"[CDPBrowserManager] CDP connection failed: {e}")
             raise
+
+    async def _connect_with_retry(
+        self,
+        connect_action: Callable[[], Awaitable[Browser]],
+        ws_url: str,
+    ) -> Browser:
+        """
+        Retry CDP connections a few times to absorb transient confirmation and
+        browser startup delays.
+        """
+        retry_count = config.CDP_CONNECT_RETRY_COUNT
+        retry_delay = config.CDP_CONNECT_RETRY_DELAY_SEC
+        last_error: Exception | None = None
+
+        for attempt in range(1, retry_count + 1):
+            try:
+                return await connect_action()
+            except Exception as err:
+                last_error = err
+                if attempt >= retry_count:
+                    break
+                utils.logger.warning(
+                    f"[CDPBrowserManager] CDP connect attempt {attempt}/{retry_count} failed for {ws_url}: {err}. "
+                    f"Retrying in {retry_delay}s..."
+                )
+                await asyncio.sleep(retry_delay)
+
+        if last_error is None:
+            raise RuntimeError("CDP connection failed without an exception")
+
+        raise RuntimeError(
+            f"CDP connection failed after {retry_count} attempts for {ws_url}"
+        ) from last_error
 
     async def _create_browser_context(
         self, playwright_proxy: Optional[Dict] = None, user_agent: Optional[str] = None
