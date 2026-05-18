@@ -239,13 +239,14 @@ class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
 
         result = []
         pcursor = ""
+        limit_comments = max_count > 0
 
-        while pcursor != "no_more" and len(result) < max_count:
+        while pcursor != "no_more" and (not limit_comments or len(result) < max_count):
             comments_res = await self.get_video_comments(photo_id, pcursor)
             # V2 API returns data at top level, not nested in visionCommentList
             pcursor = comments_res.get("pcursorV2", "no_more")
             comments = comments_res.get("rootCommentsV2", [])
-            if len(result) + len(comments) > max_count:
+            if limit_comments and len(result) + len(comments) > max_count:
                 comments = comments[: max_count - len(result)]
             if callback:  # If there is a callback function, execute the callback function
                 await callback(photo_id, comments)
