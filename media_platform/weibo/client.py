@@ -211,13 +211,14 @@ class WeiboClient(ProxyRefreshMixin):
         is_end = False
         max_id = -1
         max_id_type = 0
-        while not is_end and len(result) < max_count:
+        limit_comments = max_count > 0
+        while not is_end and (not limit_comments or len(result) < max_count):
             comments_res = await self.get_note_comments(note_id, max_id, max_id_type)
             max_id: int = comments_res.get("max_id")
             max_id_type: int = comments_res.get("max_id_type")
             comment_list: List[Dict] = comments_res.get("data", [])
             is_end = max_id == 0
-            if len(result) + len(comment_list) > max_count:
+            if limit_comments and len(result) + len(comment_list) > max_count:
                 comment_list = comment_list[:max_count - len(result)]
             if callback:  # If callback function exists, execute it
                 await callback(note_id, comment_list)
