@@ -16,6 +16,8 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
+from pathlib import Path
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -54,14 +56,13 @@ def get_async_engine(db_type: str = None):
     if db_type is None:
         db_type = config.SAVE_DATA_OPTION
 
-    if db_type in _engines:
-        return _engines[db_type]
-
     if db_type in ["json", "jsonl", "csv"]:
         return None
 
     if db_type == "sqlite":
-        db_url = f"sqlite+aiosqlite:///{sqlite_db_config['db_path']}"
+        sqlite_path = Path(sqlite_db_config["db_path"]).expanduser()
+        sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        db_url = f"sqlite+aiosqlite:///{sqlite_path}"
     elif db_type == "mysql" or db_type == "db":
         db_url = f"mysql+asyncmy://{mysql_db_config['user']}:{mysql_db_config['password']}@{mysql_db_config['host']}:{mysql_db_config['port']}/{mysql_db_config['db_name']}"
     elif db_type == "postgres":
@@ -69,8 +70,11 @@ def get_async_engine(db_type: str = None):
     else:
         raise ValueError(f"Unsupported database type: {db_type}")
 
+    if db_url in _engines:
+        return _engines[db_url]
+
     engine = create_async_engine(db_url, echo=False)
-    _engines[db_type] = engine
+    _engines[db_url] = engine
     return engine
 
 
