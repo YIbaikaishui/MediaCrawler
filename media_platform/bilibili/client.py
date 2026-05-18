@@ -279,7 +279,8 @@ class BilibiliClient(AbstractApiClient, ProxyRefreshMixin):
         is_end = False
         next_page = 0
         max_retries = 3
-        while not is_end and len(result) < max_count:
+        limit_comments = max_count > 0
+        while not is_end and (not limit_comments or len(result) < max_count):
             comments_res = None
             for attempt in range(max_retries):
                 try:
@@ -320,7 +321,7 @@ class BilibiliClient(AbstractApiClient, ProxyRefreshMixin):
                     comment_id = comment['rpid']
                     if (comment.get("rcount", 0) > 0):
                         {await self.get_video_all_level_two_comments(video_id, comment_id, CommentOrderType.DEFAULT, 10, crawl_interval, callback)}
-            if len(result) + len(comment_list) > max_count:
+            if limit_comments and len(result) + len(comment_list) > max_count:
                 comment_list = comment_list[:max_count - len(result)]
             if callback:  # If there is a callback function, execute it
                 await callback(video_id, comment_list)
