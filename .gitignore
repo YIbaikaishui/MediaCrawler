@@ -179,3 +179,7 @@ agent_zone
 debug_tools
 
 database/*.db
+database/csv_export/
+database/platform_sqlite/
+
+.atomcode/
