@@ -426,7 +426,8 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
         result = []
         comments_has_more = True
         comments_cursor = ""
-        while comments_has_more and len(result) < max_count:
+        limit_comments = max_count > 0
+        while comments_has_more and (not limit_comments or len(result) < max_count):
             comments_res = await self.get_note_comments(
                 note_id=note_id, xsec_token=xsec_token, cursor=comments_cursor
             )
@@ -438,7 +439,7 @@ class XiaoHongShuClient(AbstractApiClient, ProxyRefreshMixin):
                 )
                 break
             comments = comments_res["comments"]
-            if len(result) + len(comments) > max_count:
+            if limit_comments and len(result) + len(comments) > max_count:
                 comments = comments[: max_count - len(result)]
             if callback:
                 await callback(note_id, comments)
