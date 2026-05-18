@@ -124,7 +124,9 @@ class ZhihuCrawler(AbstractCrawler):
                 "[ZhihuCrawler.start] Zhihu navigating to search page to get search page cookies, this process takes about 5 seconds"
             )
             await self.context_page.goto(
-                f"{self.index_url}/search?q=python&search_source=Guess&utm_content=search_hot&type=content"
+                f"{self.index_url}/search?q=python&search_source=Guess&utm_content=search_hot&type=content",
+                wait_until="domcontentloaded",
+                timeout=60_000,
             )
             await asyncio.sleep(5)
             await self.zhihu_client.update_cookies(
