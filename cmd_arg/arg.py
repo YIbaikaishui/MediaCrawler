@@ -271,7 +271,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             int,
             typer.Option(
                 "--max_comments_count_singlenotes",
-                help="Maximum number of first-level comments to crawl per post/video",
+                help="Maximum number of first-level comments to crawl per post/video (0 or negative means crawl all)",
                 rich_help_panel="Comment Configuration",
             ),
         ] = config.CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES,
