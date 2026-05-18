@@ -64,6 +64,30 @@ class DouYinCrawler(AbstractCrawler):
         self.cdp_manager = None
         self.ip_proxy_pool = None  # Proxy IP pool for automatic proxy refresh
 
+    @staticmethod
+    def _needs_manual_verification(page_title: str) -> bool:
+        return "验证码中间页" in page_title
+
+    async def _wait_for_manual_verification_if_needed(self, timeout_seconds: int = 180) -> None:
+        page_title = await self.context_page.title()
+        if not self._needs_manual_verification(page_title):
+            return
+
+        utils.logger.warning(
+            "[DouYinCrawler] Douyin opened the captcha middle page. "
+            f"Please complete verification in the visible browser within {timeout_seconds}s."
+        )
+
+        for _ in range(timeout_seconds):
+            await asyncio.sleep(1)
+            page_title = await self.context_page.title()
+            if not self._needs_manual_verification(page_title):
+                utils.logger.info("[DouYinCrawler] Manual verification completed.")
+                await asyncio.sleep(2)
+                return
+
+        raise RuntimeError("Douyin manual verification was not completed in time.")
+
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
         if config.ENABLE_IP_PROXY:
@@ -95,7 +119,12 @@ class DouYinCrawler(AbstractCrawler):
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
 
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await self.context_page.goto(
+                self.index_url,
+                wait_until="domcontentloaded",
+                timeout=60 * 1000,
+            )
+            await self._wait_for_manual_verification_if_needed()
 
             self.dy_client = await self.create_douyin_client(httpx_proxy_format)
             if not await self.dy_client.pong(browser_context=self.browser_context):
