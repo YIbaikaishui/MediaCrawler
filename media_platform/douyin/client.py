@@ -270,14 +270,15 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         result = []
         comments_has_more = 1
         comments_cursor = 0
-        while comments_has_more and len(result) < max_count:
+        limit_comments = max_count > 0
+        while comments_has_more and (not limit_comments or len(result) < max_count):
             comments_res = await self.get_aweme_comments(aweme_id, comments_cursor)
             comments_has_more = comments_res.get("has_more", 0)
             comments_cursor = comments_res.get("cursor", 0)
             comments = comments_res.get("comments", [])
             if not comments:
                 continue
-            if len(result) + len(comments) > max_count:
+            if limit_comments and len(result) + len(comments) > max_count:
                 comments = comments[:max_count - len(result)]
             result.extend(comments)
             if callback:  # If there is a callback function, execute the callback function
