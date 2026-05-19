@@ -33,6 +33,21 @@
 
 一个功能强大的**多平台自媒体数据采集工具**，支持小红书、抖音、快手、B站、微博、贴吧、知乎等主流平台的公开信息抓取。
 
+## 🪶 单机最简模式
+
+如果是一台电脑、每天只抓少量内容、最后只需要 `CSV`，推荐直接走最简模式：
+
+1. 不启用代理池。
+2. 不要求 `Redis`。
+3. 先把数据落到 `SQLite`。
+4. 最后再导出成 `CSV`。
+
+说明：
+
+- 这个项目里的 `Redis` 主要用于代理 IP 池缓存，不是主数据存储。
+- 对单机、低频、少量抓取场景，通常不需要 `Redis`。
+- 默认配置里 `ENABLE_IP_PROXY = False`，`SAVE_DATA_OPTION = "sqlite"`，已经接近这条最简路径。
+
 ### 🔧 技术原理
 
 - **核心技术**：基于 [Playwright](https://playwright.dev/) 浏览器自动化框架登录保存登录态
@@ -140,6 +155,9 @@ uv run playwright install
 ```shell
 # 在 config/base_config.py 查看配置项目功能，写的有中文注释
 
+# 单机最简模式：单平台搜索 -> sqlite
+uv run main.py --platform xhs --lt qrcode --type search --keywords "关键词" --save_data_option sqlite
+
 # 从配置文件中读取关键词搜索相关的帖子并爬取帖子信息与评论
 uv run main.py --platform xhs --lt qrcode --type search
 
@@ -150,6 +168,16 @@ uv run main.py --platform xhs --lt qrcode --type detail
 
 # 其他平台爬虫使用示例，执行下面的命令查看
 uv run main.py --help
+```
+
+### 导出 CSV
+
+```shell
+# 导出全部 sqlite 数据库到 CSV
+uv run python export_sqlite_to_csv.py
+
+# 只导出单个平台
+uv run python export_sqlite_to_csv.py --db xhs
 ```
 
 <details>
