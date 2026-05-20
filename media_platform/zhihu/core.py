@@ -41,10 +41,12 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import zhihu as zhihu_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.time_window import resolve_time_window, timestamp_in_window
 from var import crawler_type_var, source_keyword_var
 
 from .client import ZhiHuClient
 from .exception import DataFetchError
+from .field import SearchSort, SearchTime
 from .help import ZhihuExtractor, judge_zhihu_url
 from .login import ZhiHuLogin
 
@@ -155,6 +157,12 @@ class ZhihuCrawler(AbstractCrawler):
         zhihu_limit_count = 20  # zhihu limit page fixed value
         if config.CRAWLER_MAX_NOTES_COUNT < zhihu_limit_count:
             config.CRAWLER_MAX_NOTES_COUNT = zhihu_limit_count
+        active_window = resolve_time_window(
+            window_start=config.SEARCH_WINDOW_START,
+            window_end=config.SEARCH_WINDOW_END,
+        )
+        search_sort = SearchSort.CREATE_TIME if active_window else SearchSort.DEFAULT
+        search_time = SearchTime.ONE_DAY if active_window else SearchTime.DEFAULT
         start_page = config.START_PAGE
         for keyword in config.KEYWORDS.split(","):
             source_keyword_var.set(keyword)
@@ -178,8 +186,16 @@ class ZhihuCrawler(AbstractCrawler):
                         await self.zhihu_client.get_note_by_keyword(
                             keyword=keyword,
                             page=page,
+                            sort=search_sort,
+                            search_time=search_time,
                         )
                     )
+                    if active_window:
+                        content_list = [
+                            content
+                            for content in content_list
+                            if timestamp_in_window(active_window, content.created_time)
+                        ]
                     utils.logger.info(
                         f"[ZhihuCrawler.search] Search contents :{content_list}"
                     )

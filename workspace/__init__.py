@@ -1,4 +1,4 @@
-from workspace.ribao_social_crawl import (
+from .ribao_social_crawl import (
     DEFAULT_PLATFORMS,
     PlatformExportResult,
     RibaoSocialCrawlRequest,
@@ -27,7 +27,3 @@ __all__ = [
     "prepare_output_dir",
     "run_ribao_social_crawl",
 ]
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

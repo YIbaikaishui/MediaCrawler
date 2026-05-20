@@ -39,6 +39,7 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import xhs as xhs_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.time_window import resolve_time_window, timestamp_in_window
 from var import crawler_type_var, source_keyword_var
 
 from .client import XiaoHongShuClient
@@ -132,6 +133,15 @@ class XiaoHongShuCrawler(AbstractCrawler):
         xhs_limit_count = 20  # Xiaohongshu limit page fixed value
         if config.CRAWLER_MAX_NOTES_COUNT < xhs_limit_count:
             config.CRAWLER_MAX_NOTES_COUNT = xhs_limit_count
+        active_window = resolve_time_window(
+            window_start=config.SEARCH_WINDOW_START,
+            window_end=config.SEARCH_WINDOW_END,
+        )
+        search_sort = (
+            SearchSortType.LATEST
+            if active_window
+            else (SearchSortType(config.SORT_TYPE) if config.SORT_TYPE != "" else SearchSortType.GENERAL)
+        )
         start_page = config.START_PAGE
         for keyword in config.KEYWORDS.split(","):
             source_keyword_var.set(keyword)
@@ -152,12 +162,13 @@ class XiaoHongShuCrawler(AbstractCrawler):
                         keyword=keyword,
                         search_id=search_id,
                         page=page,
-                        sort=(SearchSortType(config.SORT_TYPE) if config.SORT_TYPE != "" else SearchSortType.GENERAL),
+                        sort=search_sort,
                     )
                     utils.logger.info(f"[XiaoHongShuCrawler.search] Search notes response: {notes_res}")
-                    if not notes_res or not notes_res.get("has_more", False):
+                    if not notes_res:
                         utils.logger.info("[XiaoHongShuCrawler.search] No more content!")
                         break
+                    has_more = bool(notes_res.get("has_more", False))
                     semaphore = asyncio.Semaphore(config.MAX_CONCURRENCY_NUM)
                     task_list = [
                         self.get_note_detail_async_task(
@@ -170,6 +181,8 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     note_details = await asyncio.gather(*task_list)
                     for note_detail in note_details:
                         if note_detail:
+                            if active_window and not timestamp_in_window(active_window, note_detail.get("time")):
+                                continue
                             await xhs_store.update_xhs_note(note_detail)
                             await self.get_notice_media(note_detail)
                             note_ids.append(note_detail.get("note_id"))
@@ -181,6 +194,9 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     # Sleep after each page navigation
                     await asyncio.sleep(config.CRAWLER_MAX_SLEEP_SEC)
                     utils.logger.info(f"[XiaoHongShuCrawler.search] Sleeping for {config.CRAWLER_MAX_SLEEP_SEC} seconds after page {page-1}")
+                    if not has_more:
+                        utils.logger.info("[XiaoHongShuCrawler.search] Reached final search page.")
+                        break
                 except DataFetchError:
                     utils.logger.error("[XiaoHongShuCrawler.search] Get note detail error")
                     break

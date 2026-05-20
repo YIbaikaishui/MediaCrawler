@@ -42,6 +42,13 @@ def _env_int(name: str, default: int) -> int:
     except ValueError:
         return default
 
+
+def _env_str(name: str, default: str = "") -> str:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip()
+
 # Basic configuration
 PLATFORM = "xhs"  # Platform, xhs | dy | ks | bili | wb | tieba | zhihu
 
@@ -168,6 +175,11 @@ CRAWLER_MAX_SLEEP_SEC = 2
 # 是否禁用 SSL 证书验证。仅在使用企业代理、Burp Suite、mitmproxy 等会注入自签名证书的中间人代理时设为 True。
 # 警告：禁用 SSL 验证将使所有流量暴露于中间人攻击风险，请勿在生产环境中开启。
 DISABLE_SSL_VERIFY = False
+
+# Optional time window override for search mode.
+# When set, platform search should prefer recent results and post-filter by this window.
+SEARCH_WINDOW_START = _env_str("MEDIA_CRAWLER_WINDOW_START", "")
+SEARCH_WINDOW_END = _env_str("MEDIA_CRAWLER_WINDOW_END", "")
 
 from .bilibili_config import *
 from .xhs_config import *
